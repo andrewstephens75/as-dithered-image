@@ -198,6 +198,5 @@ class ASDitheredImage extends HTMLElement {
 
 }
 
-
 window.customElements.define('as-dithered-image', ASDitheredImage);
 

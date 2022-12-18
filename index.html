@@ -12,7 +12,7 @@
     }
 </style>
 
-<script src="dithered-image.js"></script>
+<script src="as-dithered-image.js"></script>
 <script>
     window.addEventListener("load", (e) => {
         const c = document.getElementById("pixel")
@@ -23,14 +23,9 @@
 
 <body>
     <!-- <canvas id="drawing" class="canvasstyle" width="1024" height="768"></canvas> -->
-    <p>The painting has been definitively identified to depict Italian noblewoman Lisa Gherardini,[9] the wife of
-        Francesco del Giocondo. It is painted in oil on a white Lombardy poplar panel. Leonardo never gave the painting
-        to the Giocondo family, and later it is believed he left it in his will to his favored apprentice Salaì.[10] It
-        had been believed to have been painted between 1503 and 1506; however, Leonardo may have continued working on it
-        as late as 1517. It was acquired by King Francis I of France and is now the property of the French Republic. It
-        has been on permanent display at the Louvre in Paris since 1797.[11]
-        <as-dithered-image src="monalisa.jpg" class="canvasstyle"></as-dithered-image>
-    </p>
+    <as-dithered-image src="monalisa.jpg" class="canvasstyle" crunch="1"></as-dithered-image>
+    <as-dithered-image src="monalisa.jpg" class="canvasstyle" crunch="2"></as-dithered-image>
+    <as-dithered-image src="monalisa.jpg" class="canvasstyle" crunch="pixel"></as-dithered-image>
     The device pixel ratio = <span id="pixel"></span>
 </body>
 
