@@ -2,9 +2,8 @@ const DITHERED_IMAGE_STYLE = `
 .ditheredImageStyle {
     width: 100%;
     height: 100%;
-    padding: none
-    margin: none
-
+    padding: 0;
+    margin: 0;
 }
 `
 
@@ -15,6 +14,8 @@ class ASDitheredImage extends HTMLElement {
         // the canvas API is confusing if you want pixel accurate drawing. The canvas backing store must be set to the screen size * the devicePixelRatio
         // The crunch factor is how "chunky" the dither should be, but this is confusing 
         this.crunchFactor = this.getAutoCrunchFactor()
+        this.drawTimestamp = 0
+        this.drawRect = undefined
     }
 
     connectedCallback() {
@@ -34,18 +35,17 @@ class ASDitheredImage extends HTMLElement {
 
         this.context = this.canvas.getContext("2d")
 
-        this.drawImage(this.src)
-
         const resizeObserver = new ResizeObserver((entries) => {
             for (const e of entries) {
                 if (e.contentBoxSize) {
-                    console.log("resize to ", e.contentBoxSize[0])
-                    this.drawImage(this.src)
+                    this.requestUpdate()
                 }
             }
         })
 
         resizeObserver.observe(this.canvas)
+
+        this.requestUpdate()
 
     }
 
@@ -66,7 +66,7 @@ class ASDitheredImage extends HTMLElement {
 
         if ((name === "src")) {
             this.src = newValue
-            this.drawImage(this.src)
+            this.requestUpdate()
         } else if (name === "crunch") {
             if (newValue === "auto") {
                 this.crunchFactor = this.getAutoCrunchFactor()
@@ -79,21 +79,38 @@ class ASDitheredImage extends HTMLElement {
                 }
             }
             console.log("crunch", this.crunchFactor)
-            this.drawImage(this.src)
+            this.requestUpdate()
         }
     }
 
-    drawImage(src) {
+    // all drawing is funneled through requestUpdate so that multiple calls are coalesced to prevent
+    // processing the image multiple times for no good reason
+    requestUpdate() {
+        window.requestAnimationFrame(((timestamp) => {
+            if (this.drawTimestamp != timestamp) {
+                this.drawImage()
+                this.drawTimestamp = timestamp
+            }
+        }).bind(this))
+    }
+
+    drawImage() {
         if ((this.canvas === undefined) || (this.src === undefined)) {
             return
         }
-        console.log("Drawing ", src, " with crunch=", this.crunchFactor)
+        console.log("Drawing ", this.src, " with crunch=", this.crunchFactor)
         const rect = this.canvas.getBoundingClientRect()
+
+        if ((this.drawRect != undefined) && (rect.width == this.drawRect.width) && (rect.height == this.drawRect.height)) {
+            return // already drawn the image at this size
+        }
+
+        this.drawRect = rect;
+
         // to get really crisp pixels on retina-type displays (window.devicePixelRatio > 1) we have to set the
         // canvas backing store to the element size times the devicePixelRatio
         // Then, once the image has loaded we draw it manually scaled to only part of the canvas (since the canvas is bigger than the element)
         // The dithering algorythm will scale up the image to the canvas size
-
         const logicalPixelSize = window.devicePixelRatio * this.crunchFactor
         this.canvas.width = rect.width * window.devicePixelRatio
         this.canvas.height = rect.height * window.devicePixelRatio
@@ -103,16 +120,14 @@ class ASDitheredImage extends HTMLElement {
         image.onload = (() => {
             this.context.imageSmoothingEnabled = true
             this.context.drawImage(image, 0, 0, this.canvas.width / logicalPixelSize, this.canvas.height / logicalPixelSize)
-            console.log(this.canvas.width, this.canvas.height)
             const original = this.context.getImageData(0, 0, this.canvas.width / logicalPixelSize, this.canvas.height / logicalPixelSize)
 
             const dithered = this.dither(original, logicalPixelSize)
-            console.log(dithered.width, dithered.height)
             this.context.imageSmoothingEnabled = false
             this.context.putImageData(dithered, 0, 0)
         }).bind(this)
 
-        image.src = src
+        image.src = this.src
     }
 
     static get observedAttributes() { return ["src", "crunch"] }
