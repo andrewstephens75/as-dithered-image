@@ -59,20 +59,25 @@ class ASDitheredImage extends HTMLElement {
             return
         }
         const rect = this.canvas.getBoundingClientRect()
-        this.canvas.width = rect.width * window.devicePixelRatio
-        this.canvas.height = rect.height * window.devicePixelRatio
+        // to get really crisp pixels on retina-type displays (window.devicePixelRatio > 1) we have to set the
+        // canvas backing store to the element size times the devicePixelRatio
+        // Then, once the image has loaded we draw it manually scaled to only part of the canvas (since the canvas is bigger than the element)
+        // The dithering algorythm will scale up the image to the canvas size
 
-        this.canvas.width = Math.floor(this.canvas.width / 2)
-        this.canvas.height = Math.floor(this.canvas.height / 2)
+        const logicalPixelSize = window.devicePixelRatio
+
+        this.canvas.width = rect.width * logicalPixelSize
+        this.canvas.height = rect.height * logicalPixelSize
 
         const image = new Image()
         image.onload = (() => {
             this.context.imageSmoothingEnabled = true
-            this.context.drawImage(image, 0, 0, this.canvas.width, this.canvas.height)
+            this.context.drawImage(image, 0, 0, this.canvas.width / logicalPixelSize, this.canvas.height / logicalPixelSize)
             console.log(this.canvas.width, this.canvas.height)
-            const original = this.context.getImageData(0, 0, this.canvas.width, this.canvas.height)
+            const original = this.context.getImageData(0, 0, this.canvas.width / logicalPixelSize, this.canvas.height / logicalPixelSize)
 
-            const dithered = this.dither(original)
+            const dithered = this.dither(original, logicalPixelSize)
+            console.log(dithered.width, dithered.height)
             this.context.imageSmoothingEnabled = false
             this.context.putImageData(dithered, 0, 0)
         }).bind(this)
@@ -82,13 +87,13 @@ class ASDitheredImage extends HTMLElement {
 
     static get observedAttributes() { return ["src"] }
 
-    dither(imageData) {
-        let output = new ImageData(imageData.width, imageData.height)
+    dither(imageData, scaleFactor) {
+        let output = new ImageData(imageData.width * scaleFactor, imageData.height * scaleFactor)
         for (let i = 0; i < imageData.data.length; i += 4) {
-            output.data[i] = output.data[i + 1] = output.data[i + 2] = Math.floor(imageData.data[i] * 0.3 + imageData.data[i + 1] * 0.59 + imageData.data[i + 2] * 0.11)
-            output.data[i + 3] = imageData.data[i + 3]
+            imageData.data[i] = imageData.data[i + 1] = imageData.data[i + 2] = Math.floor(imageData.data[i] * 0.3 + imageData.data[i + 1] * 0.59 + imageData.data[i + 2] * 0.11)
         }
         console.log("grey")
+
 
 
         let slidingErrorWindow = [new Float32Array(imageData.width), new Float32Array(imageData.width), new Float32Array(imageData.width)]
@@ -98,7 +103,7 @@ class ASDitheredImage extends HTMLElement {
             for (let x = 0, limX = imageData.width; x < limX; ++x) {
                 let i = ((y * limX) + x) * 4;
                 let accumulatedError = Math.floor(slidingErrorWindow[0][x])
-                let expectedMono = output.data[i] + accumulatedError
+                let expectedMono = imageData.data[i] + accumulatedError
                 let monoValue = expectedMono
                 if (monoValue <= 127) {
                     monoValue = 0
@@ -113,7 +118,18 @@ class ASDitheredImage extends HTMLElement {
                         slidingErrorWindow[offsets[q][1]][offsetX] += error
                 }
 
-                output.data[i] = output.data[i + 1] = output.data[i + 2] = monoValue
+                // this is stupid but we have to do the pixel scaling ourselves because safari insists on interpolating putImageData
+                // which gives us blury pixels (and it doesn't support the createImageBitmap call with an ImageData instance which
+                // would make this easy)
+
+                for (let scaleY = 0; scaleY < scaleFactor; ++scaleY) {
+                    let pixelOffset = (((y * scaleFactor + scaleY) * output.width) + (x * scaleFactor)) * 4
+                    for (let scaleX = 0; scaleX < scaleFactor; ++scaleX) {
+                        output.data[pixelOffset] = output.data[pixelOffset + 1] = output.data[pixelOffset + 2] = monoValue
+                        output.data[pixelOffset + 3] = 255
+                        pixelOffset += 4
+                    }
+                }
             }
             // move the sliding window
             slidingErrorWindow.push(slidingErrorWindow.shift())
