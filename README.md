@@ -50,8 +50,8 @@ as-dithered-image takes 3 attributes:
  * **alt** the alt text, important for screen readers
  * **crunch** an integer to control the size of the dithered pixels relative to screen pixels, setting this to 1 means the image will be dithered to screen pixels. 2 dithers the images as if the pixels were twice as big, etc. There are two special values. 
  
-* * **auto** (the default) attempts to give good results on very high-DPI screens (like iPhones) which have such small pixels that standard dithering just looks grey. It is equivalent of 1 on most displays and 2 on devices where the ratio of screen to css pixels is 3 or more.
-* * **pixel** dither to screen pixels. This can either look amazing or wasted depending on the size of the screen but you paid for all the pixels so you might as well use them.
+   * **auto** (the default) attempts to give good results on very high-DPI screens (like iPhones) which have such small pixels that standard dithering just looks grey. It is equivalent of 1 on most displays and 2 on devices where the ratio of screen to css pixels is 3 or more.
+   * **pixel** dither to screen pixels. This can either look amazing or wasted depending on the size of the screen but you paid for all the pixels so you might as well use them.
 
 ## Downsides
 
