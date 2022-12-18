@@ -14,6 +14,11 @@
 
 <script src="dithered-image.js"></script>
 <script>
+    window.addEventListener("load", (e) => {
+        const c = document.getElementById("pixel")
+
+        c.innerText = window.devicePixelRatio
+    })
 
     // function dither(imageData) {
     //     let output = new ImageData(imageData.width, imageData.height)
@@ -101,6 +106,7 @@
 <body>
     <!-- <canvas id="drawing" class="canvasstyle" width="1024" height="768"></canvas> -->
     <as-dithered-image src="test.jpg" class="canvasstyle"></as-dithered-image>
+    The device pixel ratio = <span id="pixel"></span>
 </body>
 
 </html>
