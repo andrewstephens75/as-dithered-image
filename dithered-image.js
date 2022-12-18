@@ -11,6 +11,10 @@ const DITHERED_IMAGE_STYLE = `
 class ASDitheredImage extends HTMLElement {
     constructor() {
         super()
+
+        // the canvas API is confusing if you want pixel accurate drawing. The canvas backing store must be set to the screen size * the devicePixelRatio
+        // The crunch factor is how "chunky" the dither should be, but this is confusing 
+        this.crunchFactor = this.getAutoCrunchFactor()
     }
 
     connectedCallback() {
@@ -45,12 +49,37 @@ class ASDitheredImage extends HTMLElement {
 
     }
 
+    // The crunch factor defaults to the device pixel ratio, which gives a 1 css pixel to 1 dither pixel effect
+    // which I think looks best when the device pixel ratio is 1 or 2
+    // If the pixel ratio is 3 or above (like on my iPhone) then even css pixels are too small to make dithering
+    // look effective, so I double the pixels again
+    getAutoCrunchFactor() {
+        if (window.devicePixelRatio < 3) {
+            return 1
+        } else {
+            return 2
+        }
+    }
+
     attributeChangedCallback(name, oldValue, newValue) {
-        if ((name === "src") && (oldValue !== newValue)) {
+        if (oldValue === newValue) return
+
+        if ((name === "src")) {
             this.src = newValue
             this.drawImage(this.src)
-        } else {
-            console.log(name)
+        } else if (name === "crunch") {
+            if (newValue === "auto") {
+                this.crunchFactor = this.getAutoCrunchFactor()
+            } else if (newValue === "pixel") {
+                this.crunchFactor = 1.0 / window.devicePixelRatio
+            } else {
+                this.crunchFactor = parseInt(newValue, 10)
+                if (isNaN(this.crunchFactor)) {
+                    this.crunchFactor = this.getAutoCrunchFactor()
+                }
+            }
+            console.log("crunch", this.crunchFactor)
+            this.drawImage(this.src)
         }
     }
 
@@ -58,16 +87,17 @@ class ASDitheredImage extends HTMLElement {
         if ((this.canvas === undefined) || (this.src === undefined)) {
             return
         }
+        console.log("Drawing ", src, " with crunch=", this.crunchFactor)
         const rect = this.canvas.getBoundingClientRect()
         // to get really crisp pixels on retina-type displays (window.devicePixelRatio > 1) we have to set the
         // canvas backing store to the element size times the devicePixelRatio
         // Then, once the image has loaded we draw it manually scaled to only part of the canvas (since the canvas is bigger than the element)
         // The dithering algorythm will scale up the image to the canvas size
 
-        const logicalPixelSize = window.devicePixelRatio
+        const logicalPixelSize = window.devicePixelRatio * this.crunchFactor
+        this.canvas.width = rect.width * window.devicePixelRatio
+        this.canvas.height = rect.height * window.devicePixelRatio
 
-        this.canvas.width = rect.width * logicalPixelSize
-        this.canvas.height = rect.height * logicalPixelSize
 
         const image = new Image()
         image.onload = (() => {
@@ -85,7 +115,7 @@ class ASDitheredImage extends HTMLElement {
         image.src = src
     }
 
-    static get observedAttributes() { return ["src"] }
+    static get observedAttributes() { return ["src", "crunch"] }
 
     dither(imageData, scaleFactor) {
         let output = new ImageData(imageData.width * scaleFactor, imageData.height * scaleFactor)
