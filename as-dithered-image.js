@@ -72,7 +72,6 @@ class ASDitheredImage extends HTMLElement {
                     this.crunchFactor = this.getAutoCrunchFactor()
                 }
             }
-            console.log("crunch", this.crunchFactor)
             this.requestUpdate()
         } else if (name === "alt") {
             this.altText = newValue;
@@ -111,7 +110,6 @@ class ASDitheredImage extends HTMLElement {
         if ((this.canvas === undefined) || (this.src === undefined)) {
             return
         }
-        console.log("Drawing ", this.src, " with crunch=", this.crunchFactor)
         const rect = this.canvas.getBoundingClientRect()
 
         if ((this.drawRect != undefined) && (rect.width == this.drawRect.width) && (rect.height == this.drawRect.height)) {
@@ -149,9 +147,9 @@ class ASDitheredImage extends HTMLElement {
         for (let i = 0; i < imageData.data.length; i += 4) {
             imageData.data[i] = imageData.data[i + 1] = imageData.data[i + 2] = Math.floor(imageData.data[i] * 0.3 + imageData.data[i + 1] * 0.59 + imageData.data[i + 2] * 0.11)
         }
-        console.log("grey")
 
-
+        // most implementations I see just distibute error into the existing image, wrapping around edge pixels
+        // this implementation uses a sliding window of floats for more accuracy (probably not needed really)
 
         let slidingErrorWindow = [new Float32Array(imageData.width), new Float32Array(imageData.width), new Float32Array(imageData.width)]
         const offsets = [[1, 0], [2, 0], [-1, 1], [0, 1], [1, 1], [0, 2]]
@@ -192,7 +190,6 @@ class ASDitheredImage extends HTMLElement {
             slidingErrorWindow.push(slidingErrorWindow.shift())
             slidingErrorWindow[2].fill(0, 0, slidingErrorWindow[2].length)
         }
-        console.log("done")
         return output
     }
 
