@@ -1,12 +1,12 @@
 # Custom HTML Element for Client-side Atkinson Dithering
 
-There are many dithering algorithms to crush multi-colored images down to black and which but the one I like best was introduce with the original Apple Macintosh for its crisp 512x342 monochrome dispay. One of Apple's engineers, [Bill Atkinson](https://en.wikipedia.org/wiki/Bill_Atkinson), developed what came to be known as Atkinson Dithering, a good trade-off between fast and accurate with results prossessing a certain charm that on-paper "better" dithers cannot match.
+There are many dithering algorithms to crush multi-colored images down to black and which but the one I like best was introduce with the original Apple Macintosh for its crisp 512x342 monochrome display. One of Apple's engineers, [Bill Atkinson](https://en.wikipedia.org/wiki/Bill_Atkinson), developed what came to be known as Atkinson Dithering, a good trade-off between fast and accurate with results possessing a certain charm that on-paper "better" dithers cannot match.
 
 I wanted to bring this to the web.
 
 ## Why Do This Client Side?
 
-You can pre-dither your images but this gives bad results because dithering relies on the precise corrispondence between the source and out pixels. Unless you can guarentee that your image will be displayed at exactly the same size (in pixels) as it was output, the pixels of the image will not align with the pixels of your screen and the results will be either blury or fulled with weird patterns. The technical term for this is aliasing but whatever you call it, it ruins your image. 
+You can pre-dither your images but this gives bad results because dithering relies on the precise correspondence between the source and out pixels. Unless you can guarantee that your image will be displayed at exactly the same size (in pixels) as it was output, the pixels of the image will not align with the pixels of your screen and the results will be either blurry or fulled with weird patterns. The technical term for this is aliasing but whatever you call it, it ruins your image. 
 
 The only way to get really crisp results in a web browser is to dither the source image to the exact pixel size of the element when it is displayed.
 
@@ -55,7 +55,7 @@ as-dithered-image takes 3 attributes:
 
 ## Downsides and Future Improvements
 
-As it stands, as-dithered-image as a few warts. The size of the source image is not taken into account, you must set the size in the CSS which means you have to know the apsect ratio of your image up front.
+As it stands, as-dithered-image as a few warts. The size of the source image is not taken into account, you must set the size in the CSS which means you have to know the aspect ratio of your image up front.
 
 Dithering is not free, processing the image takes time. Currently this is done on the main UI thread of the browser which can lead to poor UI performance. This processing could be moved to a background thread but I got lazy.
 
