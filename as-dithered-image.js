@@ -67,7 +67,7 @@ class ASDitheredImage extends HTMLElement {
             if (newValue === "auto") {
                 this.crunchFactor = this.getAutoCrunchFactor()
             } else if (newValue === "pixel") {
-                this.crunchFactor = 1.0 / window.devicePixelRatio
+                this.crunchFactor = 1.0 / this.getDevicePixelRatio()
             } else {
                 this.crunchFactor = parseInt(newValue, 10)
                 if (isNaN(this.crunchFactor)) {
@@ -101,12 +101,17 @@ class ASDitheredImage extends HTMLElement {
     // If the pixel ratio is 3 or above (like on my iPhone) then even css pixels are too small to make dithering
     // look effective, so I double the pixels again
     getAutoCrunchFactor() {
-        if (window.devicePixelRatio < 3) {
+        if (this.getDevicePixelRatio() < 3) {
             return 1
         } else {
             return 2
         }
     }
+	
+	getDevicePixelRatio() {
+		// this should always be an integer for the dithering code to work
+		return Math.floor(window.devicePixelRatio)
+	}
 
     drawImage() {
         if ((this.canvas === undefined) || (this.src === undefined)) {
@@ -129,9 +134,9 @@ class ASDitheredImage extends HTMLElement {
         // canvas backing store to the element size times the devicePixelRatio
         // Then, once the image has loaded we draw it manually scaled to only part of the canvas (since the canvas is bigger than the element)
         // The dithering algorithm will scale up the image to the canvas size
-        const logicalPixelSize = window.devicePixelRatio * this.crunchFactor
-        this.canvas.width = rect.width * window.devicePixelRatio
-        this.canvas.height = rect.height * window.devicePixelRatio
+        const logicalPixelSize = this.getDevicePixelRatio() * this.crunchFactor
+        this.canvas.width = rect.width * this.getDevicePixelRatio()
+        this.canvas.height = rect.height * this.getDevicePixelRatio()
 
 
         const image = new Image()
