@@ -16,6 +16,8 @@ class ASDitheredImage extends HTMLElement {
         this.crunchFactor = this.getAutoCrunchFactor()
         this.drawTimestamp = 0
         this.drawRect = undefined
+        this.drawCrunchFactor = undefined
+        this.drawSrc = undefined
         this.altText = ""
     }
 
@@ -112,16 +114,21 @@ class ASDitheredImage extends HTMLElement {
         }
         const rect = this.canvas.getBoundingClientRect()
 
-        if ((this.drawRect != undefined) && (rect.width == this.drawRect.width) && (rect.height == this.drawRect.height)) {
-            return // already drawn the image at this size
+        // we only want to draw the image if something has actually changed (usually the size)
+        if ((this.drawRect != undefined) && (rect.width == this.drawRect.width) && (rect.height == this.drawRect.height) &&
+            ((this.drawCrunchFactor != undefined) && (this.crunchFactor === this.drawCrunchFactor)) &&
+            ((this.drawSrc != undefined && this.src === this.drawSrc))) {
+            return
         }
 
-        this.drawRect = rect;
+        this.drawRect = rect
+        this.drawCrunchFactor = this.crunchFactor
+        this.drawSrc = this.src
 
         // to get really crisp pixels on retina-type displays (window.devicePixelRatio > 1) we have to set the
         // canvas backing store to the element size times the devicePixelRatio
         // Then, once the image has loaded we draw it manually scaled to only part of the canvas (since the canvas is bigger than the element)
-        // The dithering algorythm will scale up the image to the canvas size
+        // The dithering algorithm will scale up the image to the canvas size
         const logicalPixelSize = window.devicePixelRatio * this.crunchFactor
         this.canvas.width = rect.width * window.devicePixelRatio
         this.canvas.height = rect.height * window.devicePixelRatio
@@ -148,7 +155,7 @@ class ASDitheredImage extends HTMLElement {
             imageData.data[i] = imageData.data[i + 1] = imageData.data[i + 2] = Math.floor(imageData.data[i] * 0.3 + imageData.data[i + 1] * 0.59 + imageData.data[i + 2] * 0.11)
         }
 
-        // most implementations I see just distibute error into the existing image, wrapping around edge pixels
+        // most implementations I see just distribute error into the existing image, wrapping around edge pixels
         // this implementation uses a sliding window of floats for more accuracy (probably not needed really)
 
         let slidingErrorWindow = [new Float32Array(imageData.width), new Float32Array(imageData.width), new Float32Array(imageData.width)]
@@ -174,7 +181,7 @@ class ASDitheredImage extends HTMLElement {
                 }
 
                 // this is stupid but we have to do the pixel scaling ourselves because safari insists on interpolating putImageData
-                // which gives us blury pixels (and it doesn't support the createImageBitmap call with an ImageData instance which
+                // which gives us blurry pixels (and it doesn't support the createImageBitmap call with an ImageData instance which
                 // would make this easy)
 
                 for (let scaleY = 0; scaleY < scaleFactor; ++scaleY) {
