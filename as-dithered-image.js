@@ -87,6 +87,7 @@ class ASDitheredImage extends HTMLElement {
         if (oldValue === newValue) return
 
         if ((name === "src")) {
+            this.force_refresh_ = true
             this.requestUpdate()
         } else if (name === "crunch") {
             if (newValue === "auto") {
@@ -95,10 +96,11 @@ class ASDitheredImage extends HTMLElement {
                 this.crunchFactor_ = 1.0 / this.getDevicePixelRatio()
             } else {
                 this.crunchFactor_ = parseInt(newValue, 10)
-                if (isNaN(this.crunchFactor)) {
+                if (isNaN(this.crunchFactor_)) {
                     this.crunchFactor_ = this.getAutoCrunchFactor()
                 }
             }
+            this.force_refresh_ = true
             this.requestUpdate()
         } else if (name === "alt") {
             this.altText = newValue;

@@ -14,13 +14,27 @@
         }
     </style>
 
-    <as-dithered-image class="setSize" src="Van_Gogh_-_Starry_Night_-_Google_Art_Project.jpg"></as-dithered-image>
+    <as-dithered-image class="setSize" id="picture"
+        src="Van_Gogh_-_Starry_Night_-_Google_Art_Project.jpg"></as-dithered-image>
 
     <p>devicePixelRatio = <span id=dpr>0</span></p>
+    <p><select id="crunchselect">
+            <option value="auto">Automatic</option>
+            <option value="pixel">Pixel</option>
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+        </select></p>
 </body>
 
 <script>
     document.getElementById("dpr").innerText = window.devicePixelRatio
+    let select = document.getElementById("crunchselect")
+    select.addEventListener("change", e => {
+        console.log("Crunch = ", e.target.value)
+        document.getElementById("picture").setAttribute("crunch", e.target.value)
+    })
 </script>
 
 </html>
