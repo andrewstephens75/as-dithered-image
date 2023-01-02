@@ -20,17 +20,20 @@ class ASDitheredImage extends HTMLElement {
         this.image_loading_ = false
         this.ignore_next_resize_ = false
         this.worker_ = new Worker("ditherworker.js")
+        this.cutoff_ = 0.5
 
         this.worker_.onmessage = ((e) => {
             const imageData = e.data.imageData
+            console.log("Image painted ", imageData.width, imageData.height)
             this.context_.putImageData(imageData, 0, 0)
         }).bind(this)
 
         this.resizing_timeout_ = undefined
+
+        this.last_draw_state_ = { width: 0, height: 0, crunchFactor: 0, imageSrc: "" }
     }
 
     connectedCallback() {
-        console.log("connectedCallback")
         if (!this.isConnected) {
             return
         }
@@ -55,7 +58,6 @@ class ASDitheredImage extends HTMLElement {
 
             if (entries.length > 0) {
                 if (entries[0].contentBoxSize) {
-                    console.log("contentRect=", entries[0].contentRect)
 
                     if (this.ignore_next_resize_ == true) {
                         this.ignore_next_resize_ = false
@@ -80,7 +82,7 @@ class ASDitheredImage extends HTMLElement {
 
     }
 
-    static get observedAttributes() { return ["src", "crunch", "alt"] }
+    static get observedAttributes() { return ["src", "crunch", "alt", "cutoff"] }
 
 
     attributeChangedCallback(name, oldValue, newValue) {
@@ -110,6 +112,14 @@ class ASDitheredImage extends HTMLElement {
                     this.canvas.setAttribute("aria-label", newValue)
                 }
             }
+        } else if (name === "cutoff") {
+            this.cutoff_ = parseFloat(newValue)
+            if (isNaN(this.cutoff_)) {
+                this.cutoff_ = 0.5
+            }
+            this.cutoff_ = Math.min(1.0, Math.max(0.0, this.cutoff_))
+            this.force_refresh_ = true
+            this.requestUpdate()
         }
     }
 
@@ -132,13 +142,10 @@ class ASDitheredImage extends HTMLElement {
     // all drawing is funneled through requestUpdate so that multiple calls are coalesced to prevent
     // processing the image multiple times for no good reason
     requestUpdate() {
-        console.log("requestUpdate")
         window.requestAnimationFrame(((timestamp) => {
-            console.log(this.force_refresh_, this.isConnected)
             if ((this.force_refresh_ == false)) {
                 return
             }
-            console.log("update happening")
             if (this.original_image_ == undefined) {
                 this.loadImage()
                 return
@@ -159,35 +166,47 @@ class ASDitheredImage extends HTMLElement {
             this.image_loading_ = false
             this.original_image_ = image
             this.ignore_next_resize_ = true
-            console.log("set aspect ratio")
             this.style.aspectRatio = this.original_image_.width + "/" + this.original_image_.height
             this.force_refresh_ = true
             this.requestUpdate()
-            console.log("Imaged Loaded")
         }).bind(this)
         image.onerror = (() => {
             this.image_loading_ == false
             this.original_image_ = undefined
         }).bind(this)
         this.image_loading_ = true
-        console.log("Loading ", this.getAttribute("src"))
         image.src = this.getAttribute("src")
     }
 
     repaintImage() {
         const rect = this.canvas_.getBoundingClientRect()
-
         let screenPixelsToBackingStorePixels = this.getDevicePixelRatio()
         let fractionalPart = screenPixelsToBackingStorePixels - Math.floor(screenPixelsToBackingStorePixels)
         if (fractionalPart != 0) {
             screenPixelsToBackingStorePixels = Math.round(screenPixelsToBackingStorePixels * Math.round(1.0 / fractionalPart))
         }
 
+        const calculatedWidth = rect.width * screenPixelsToBackingStorePixels
+        const calculatedHeight = rect.height * screenPixelsToBackingStorePixels
         let adjustedPixelSize = screenPixelsToBackingStorePixels * this.crunchFactor_
 
-        // this has to change for fractional device pixel ratios 
-        this.canvas_.width = rect.width * screenPixelsToBackingStorePixels
-        this.canvas_.height = rect.height * screenPixelsToBackingStorePixels
+        // double check - we may have already painted this image
+        if ((this.last_draw_state_.width == calculatedWidth) &&
+            (this.last_draw_state_.height == calculatedHeight) &&
+            (this.last_draw_state_.adjustedPixelSize == adjustedPixelSize) &&
+            (this.last_draw_state_.imageSrc == this.original_image_.currentSrc) &&
+            (this.last_draw_state_.cutoff == this.cutoff_)) {
+            return;  // nothing to do
+        }
+
+        this.canvas_.width = calculatedWidth
+        this.canvas_.height = calculatedHeight
+
+        this.last_draw_state_.width = this.canvas_.width
+        this.last_draw_state_.height = this.canvas_.height
+        this.last_draw_state_.adjustedPixelSize = adjustedPixelSize
+        this.last_draw_state_.imageSrc = this.original_image_.currentSrc
+        this.last_draw_state_.cutoff = this.cutoff_
 
         this.context_.imageSmoothingEnabled = true
         this.context_.drawImage(this.original_image_, 0, 0, this.canvas_.width / adjustedPixelSize, this.canvas_.height / adjustedPixelSize)
@@ -199,6 +218,7 @@ class ASDitheredImage extends HTMLElement {
         const msg = {}
         msg.imageData = originalData
         msg.pixelSize = adjustedPixelSize
+        msg.cutoff = this.cutoff_
         this.worker_.postMessage(msg)
 
         this.force_refresh_ = false

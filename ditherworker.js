@@ -1,13 +1,15 @@
 onmessage = function (e) {
-    console.log("Worker: start", e.data.imageData)
+    console.log("Worker: start", e.data)
 
-    const result = dither(e.data.imageData, e.data.pixelSize)
+    const result = dither(e.data.imageData, e.data.pixelSize, e.data.cutoff)
     const reply = {}
     reply.imageData = result
+    reply.pixelSize = e.data.pixelSize
+    reply.cutoff = e.data.cutoff
     postMessage(reply)
 }
 
-function dither(imageData, scaleFactor) {
+function dither(imageData, scaleFactor, cutoff) {
     let output = new ImageData(imageData.width * scaleFactor, imageData.height * scaleFactor)
     for (let i = 0; i < imageData.data.length; i += 4) {
         imageData.data[i] = imageData.data[i + 1] = imageData.data[i + 2] = Math.floor(imageData.data[i] * 0.3 + imageData.data[i + 1] * 0.59 + imageData.data[i + 2] * 0.11)
@@ -25,7 +27,7 @@ function dither(imageData, scaleFactor) {
             let accumulatedError = Math.floor(slidingErrorWindow[0][x])
             let expectedMono = imageData.data[i] + accumulatedError
             let monoValue = expectedMono
-            if (monoValue <= 127) {
+            if (monoValue <= Math.floor(cutoff * 255)) {
                 monoValue = 0
             } else {
                 monoValue = 255
