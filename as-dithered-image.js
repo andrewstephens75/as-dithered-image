@@ -14,7 +14,7 @@ class ASDitheredImage extends HTMLElement {
 
         this.original_image_ = undefined
         this.force_refresh_ = false
-        this.crunchFactor = this.getAutoCrunchFactor()
+        this.crunchFactor_ = this.getAutoCrunchFactor()
         this.canvas_ = undefined
         this.context_ = undefined
         this.image_loading_ = false
@@ -175,19 +175,28 @@ class ASDitheredImage extends HTMLElement {
     repaintImage() {
         const rect = this.canvas_.getBoundingClientRect()
 
-        const screenPixelsToBackingStorePixels = this.getDevicePixelRatio()
+        let screenPixelsToBackingStorePixels = this.getDevicePixelRatio()
+        let fractionalPart = screenPixelsToBackingStorePixels - Math.floor(screenPixelsToBackingStorePixels)
+        if (fractionalPart != 0) {
+            screenPixelsToBackingStorePixels = Math.round(screenPixelsToBackingStorePixels * Math.round(1.0 / fractionalPart))
+        }
+
+        let adjustedPixelSize = screenPixelsToBackingStorePixels * this.crunchFactor_
 
         // this has to change for fractional device pixel ratios 
         this.canvas_.width = rect.width * screenPixelsToBackingStorePixels
         this.canvas_.height = rect.height * screenPixelsToBackingStorePixels
 
-        this.context_.imageSmoothingEnabled = false
-        this.context_.drawImage(this.original_image_, 0, 0, this.canvas_.width, this.canvas_.height)
-        const originalData = this.context_.getImageData(0, 0, this.canvas_.width, this.canvas_.height)
+        this.context_.imageSmoothingEnabled = true
+        this.context_.drawImage(this.original_image_, 0, 0, this.canvas_.width / adjustedPixelSize, this.canvas_.height / adjustedPixelSize)
+        const originalData = this.context_.getImageData(0, 0, this.canvas_.width / adjustedPixelSize, this.canvas_.height / adjustedPixelSize)
+        this.context_.fillStyle = "white"
         this.context_.fillRect(0, 0, this.canvas_.width, this.canvas_.height)
         // TODO: look at transferring the data in a different datastructure to prevent copying
+        // unfortunately Safari has poor support for createImageBitmap - using it with ImageData doesn't work
         const msg = {}
         msg.imageData = originalData
+        msg.pixelSize = adjustedPixelSize
         this.worker_.postMessage(msg)
 
         this.force_refresh_ = false

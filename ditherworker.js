@@ -1,7 +1,7 @@
 onmessage = function (e) {
     console.log("Worker: start", e.data.imageData)
 
-    const result = dither(e.data.imageData, 1)
+    const result = dither(e.data.imageData, e.data.pixelSize)
     const reply = {}
     reply.imageData = result
     postMessage(reply)
