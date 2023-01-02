@@ -19,6 +19,12 @@ class ASDitheredImage extends HTMLElement {
         this.context_ = undefined
         this.image_loading_ = false
         this.ignore_next_resize_ = false
+        this.worker_ = new Worker("ditherworker.js")
+
+        this.worker_.onmessage = ((e) => {
+            const imageData = e.data.imageData
+            this.context_.putImageData(imageData, 0, 0)
+        }).bind(this)
 
         this.resizing_timeout_ = undefined
     }
@@ -177,7 +183,13 @@ class ASDitheredImage extends HTMLElement {
 
         this.context_.imageSmoothingEnabled = false
         this.context_.drawImage(this.original_image_, 0, 0, this.canvas_.width, this.canvas_.height)
-        console.log("Repainted")
+        const originalData = this.context_.getImageData(0, 0, this.canvas_.width, this.canvas_.height)
+        this.context_.fillRect(0, 0, this.canvas_.width, this.canvas_.height)
+        // TODO: look at transferring the data in a different datastructure to prevent copying
+        const msg = {}
+        msg.imageData = originalData
+        this.worker_.postMessage(msg)
+
         this.force_refresh_ = false
     }
 }
