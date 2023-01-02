@@ -4,6 +4,7 @@ const DITHERED_IMAGE_STYLE = `
     height: 100%;
     padding: 0;
     margin: 0;
+    image-rendering: crisp-edges;
 }
 `
 
@@ -11,17 +12,19 @@ class ASDitheredImage extends HTMLElement {
     constructor() {
         super()
 
-        // the canvas API is confusing if you want pixel accurate drawing. The canvas backing store must be set to the screen size * the devicePixelRatio
-        // The crunch factor is how "chunky" the dither should be, ie how many css pixels to dithered pixels
+        this.original_image_ = undefined
+        this.force_refresh_ = false
         this.crunchFactor = this.getAutoCrunchFactor()
-        this.drawTimestamp = 0
-        this.drawRect = undefined
-        this.drawCrunchFactor = undefined
-        this.drawSrc = undefined
-        this.altText = ""
+        this.canvas_ = undefined
+        this.context_ = undefined
+        this.image_loading_ = false
+        this.ignore_next_resize_ = false
+
+        this.resizing_timeout_ = undefined
     }
 
     connectedCallback() {
+        console.log("connectedCallback")
         if (!this.isConnected) {
             return
         }
@@ -32,24 +35,41 @@ class ASDitheredImage extends HTMLElement {
         style.innerHTML = DITHERED_IMAGE_STYLE
         shadowDOM.appendChild(style)
 
-        this.canvas = document.createElement("canvas")
-        this.canvas.setAttribute("role", "image")
-        this.canvas.setAttribute("aria-label", this.altText)
-        this.canvas.classList.add("ditheredImageStyle")
-        shadowDOM.appendChild(this.canvas)
+        this.canvas_ = document.createElement("canvas")
+        this.canvas_.setAttribute("role", "image")
+        this.canvas_.setAttribute("aria-label", this.getAttribute("alt"))
+        this.canvas_.classList.add("ditheredImageStyle")
+        shadowDOM.appendChild(this.canvas_)
 
-        this.context = this.canvas.getContext("2d")
+        this.context_ = this.canvas_.getContext("2d")
 
-        const resizeObserver = new ResizeObserver((entries) => {
-            for (const e of entries) {
-                if (e.contentBoxSize) {
-                    this.requestUpdate()
+        const resizeObserver = new ResizeObserver(((entries) => {
+            // browsers generated lots of resize events but we don't want to start refreshing until
+            // the user has stopped resizing the page
+
+            if (entries.length > 0) {
+                if (entries[0].contentBoxSize) {
+                    console.log("contentRect=", entries[0].contentRect)
+
+                    if (this.ignore_next_resize_ == true) {
+                        this.ignore_next_resize_ = false
+                        return
+                    }
+                    if (this.resizing_timeout_ != undefined) {
+                        clearTimeout(this.resizing_timeout_)
+                    }
+                    this.resizing_timeout_ = setTimeout((() => {
+                        this.resizing_timeout_ = undefined
+                        this.force_refresh_ = true
+                        this.requestUpdate()
+                    }).bind(this), 200)
                 }
+
             }
-        })
+        }).bind(this))
 
-        resizeObserver.observe(this.canvas)
-
+        resizeObserver.observe(this.canvas_)
+        this.force_refresh_ = true
         this.requestUpdate()
 
     }
@@ -61,17 +81,16 @@ class ASDitheredImage extends HTMLElement {
         if (oldValue === newValue) return
 
         if ((name === "src")) {
-            this.src = newValue
             this.requestUpdate()
         } else if (name === "crunch") {
             if (newValue === "auto") {
-                this.crunchFactor = this.getAutoCrunchFactor()
+                this.crunchFactor_ = this.getAutoCrunchFactor()
             } else if (newValue === "pixel") {
-                this.crunchFactor = 1.0 / this.getDevicePixelRatio()
+                this.crunchFactor_ = 1.0 / this.getDevicePixelRatio()
             } else {
-                this.crunchFactor = parseInt(newValue, 10)
+                this.crunchFactor_ = parseInt(newValue, 10)
                 if (isNaN(this.crunchFactor)) {
-                    this.crunchFactor = this.getAutoCrunchFactor()
+                    this.crunchFactor_ = this.getAutoCrunchFactor()
                 }
             }
             this.requestUpdate()
@@ -79,22 +98,11 @@ class ASDitheredImage extends HTMLElement {
             this.altText = newValue;
             if (this.canvas != undefined) {
                 let currentAltText = this.canvas.getAttribute("aria-label")
-                if (currentAltText != this.altText) {
-                    this.canvas.setAttribute("aria-label", this.altText)
+                if (currentAltText != newValue) {
+                    this.canvas.setAttribute("aria-label", newValue)
                 }
             }
         }
-    }
-
-    // all drawing is funneled through requestUpdate so that multiple calls are coalesced to prevent
-    // processing the image multiple times for no good reason
-    requestUpdate() {
-        window.requestAnimationFrame(((timestamp) => {
-            if (this.drawTimestamp != timestamp) {
-                this.drawImage()
-                this.drawTimestamp = timestamp
-            }
-        }).bind(this))
     }
 
     // The crunch factor defaults 1 css pixel to 1 dither pixel which I think looks best when the device pixel ratio is 1 or 2
@@ -107,105 +115,71 @@ class ASDitheredImage extends HTMLElement {
             return 2
         }
     }
-	
-	getDevicePixelRatio() {
-		// this should always be an integer for the dithering code to work
-		return Math.floor(window.devicePixelRatio)
-	}
 
-    drawImage() {
-        if ((this.canvas === undefined) || (this.src === undefined)) {
+    getDevicePixelRatio() {
+        // this should always be an integer for the dithering code to work
+        return Math.floor(window.devicePixelRatio)
+    }
+
+    // all drawing is funneled through requestUpdate so that multiple calls are coalesced to prevent
+    // processing the image multiple times for no good reason
+    requestUpdate() {
+        console.log("requestUpdate")
+        window.requestAnimationFrame(((timestamp) => {
+            console.log(this.force_refresh_, this.isConnected)
+            if ((this.force_refresh_ == false)) {
+                return
+            }
+            console.log("update happening")
+            if (this.original_image_ == undefined) {
+                this.loadImage()
+                return
+            }
+            if (this.force_refresh_) {
+                this.repaintImage()
+            }
+
+        }).bind(this))
+    }
+
+    loadImage() {
+        if (this.image_loading_ == true) {
             return
         }
-        const rect = this.canvas.getBoundingClientRect()
-
-        // we only want to draw the image if something has actually changed (usually the size)
-        if ((this.drawRect != undefined) && (rect.width == this.drawRect.width) && (rect.height == this.drawRect.height) &&
-            ((this.drawCrunchFactor != undefined) && (this.crunchFactor === this.drawCrunchFactor)) &&
-            ((this.drawSrc != undefined && this.src === this.drawSrc))) {
-            return
-        }
-
-        this.drawRect = rect
-        this.drawCrunchFactor = this.crunchFactor
-        this.drawSrc = this.src
-
-        // to get really crisp pixels on retina-type displays (window.devicePixelRatio > 1) we have to set the
-        // canvas backing store to the element size times the devicePixelRatio
-        // Then, once the image has loaded we draw it manually scaled to only part of the canvas (since the canvas is bigger than the element)
-        // The dithering algorithm will scale up the image to the canvas size
-        const logicalPixelSize = this.getDevicePixelRatio() * this.crunchFactor
-        this.canvas.width = rect.width * this.getDevicePixelRatio()
-        this.canvas.height = rect.height * this.getDevicePixelRatio()
-
-
         const image = new Image()
         image.onload = (() => {
-            this.context.imageSmoothingEnabled = true
-            this.context.drawImage(image, 0, 0, this.canvas.width / logicalPixelSize, this.canvas.height / logicalPixelSize)
-            const original = this.context.getImageData(0, 0, this.canvas.width / logicalPixelSize, this.canvas.height / logicalPixelSize)
-
-            const dithered = this.dither(original, logicalPixelSize)
-            this.context.imageSmoothingEnabled = false
-            this.context.putImageData(dithered, 0, 0)
+            this.image_loading_ = false
+            this.original_image_ = image
+            this.ignore_next_resize_ = true
+            console.log("set aspect ratio")
+            this.style.aspectRatio = this.original_image_.width + "/" + this.original_image_.height
+            this.force_refresh_ = true
+            this.requestUpdate()
+            console.log("Imaged Loaded")
         }).bind(this)
-
-        image.src = this.src
+        image.onerror = (() => {
+            this.image_loading_ == false
+            this.original_image_ = undefined
+        }).bind(this)
+        this.image_loading_ = true
+        console.log("Loading ", this.getAttribute("src"))
+        image.src = this.getAttribute("src")
     }
 
+    repaintImage() {
+        const rect = this.canvas_.getBoundingClientRect()
 
-    dither(imageData, scaleFactor) {
-        let output = new ImageData(imageData.width * scaleFactor, imageData.height * scaleFactor)
-        for (let i = 0; i < imageData.data.length; i += 4) {
-            imageData.data[i] = imageData.data[i + 1] = imageData.data[i + 2] = Math.floor(imageData.data[i] * 0.3 + imageData.data[i + 1] * 0.59 + imageData.data[i + 2] * 0.11)
-        }
+        const screenPixelsToBackingStorePixels = this.getDevicePixelRatio()
 
-        // most implementations I see just distribute error into the existing image, wrapping around edge pixels
-        // this implementation uses a sliding window of floats for more accuracy (probably not needed really)
+        // this has to change for fractional device pixel ratios 
+        this.canvas_.width = rect.width * screenPixelsToBackingStorePixels
+        this.canvas_.height = rect.height * screenPixelsToBackingStorePixels
 
-        let slidingErrorWindow = [new Float32Array(imageData.width), new Float32Array(imageData.width), new Float32Array(imageData.width)]
-        const offsets = [[1, 0], [2, 0], [-1, 1], [0, 1], [1, 1], [0, 2]]
-
-        for (let y = 0, limY = imageData.height; y < limY; ++y) {
-            for (let x = 0, limX = imageData.width; x < limX; ++x) {
-                let i = ((y * limX) + x) * 4;
-                let accumulatedError = Math.floor(slidingErrorWindow[0][x])
-                let expectedMono = imageData.data[i] + accumulatedError
-                let monoValue = expectedMono
-                if (monoValue <= 127) {
-                    monoValue = 0
-                } else {
-                    monoValue = 255
-                }
-                let error = (expectedMono - monoValue) / 8.0
-                for (let q = 0; q < offsets.length; ++q) {
-                    let offsetX = offsets[q][0] + x
-                    let offsetY = offsets[q][1] + y
-                    if ((offsetX >= 0) && (offsetX < slidingErrorWindow[0].length))
-                        slidingErrorWindow[offsets[q][1]][offsetX] += error
-                }
-
-                // this is stupid but we have to do the pixel scaling ourselves because safari insists on interpolating putImageData
-                // which gives us blurry pixels (and it doesn't support the createImageBitmap call with an ImageData instance which
-                // would make this easy)
-
-                for (let scaleY = 0; scaleY < scaleFactor; ++scaleY) {
-                    let pixelOffset = (((y * scaleFactor + scaleY) * output.width) + (x * scaleFactor)) * 4
-                    for (let scaleX = 0; scaleX < scaleFactor; ++scaleX) {
-                        output.data[pixelOffset] = output.data[pixelOffset + 1] = output.data[pixelOffset + 2] = monoValue
-                        output.data[pixelOffset + 3] = 255
-                        pixelOffset += 4
-                    }
-                }
-            }
-            // move the sliding window
-            slidingErrorWindow.push(slidingErrorWindow.shift())
-            slidingErrorWindow[2].fill(0, 0, slidingErrorWindow[2].length)
-        }
-        return output
+        this.context_.imageSmoothingEnabled = false
+        this.context_.drawImage(this.original_image_, 0, 0, this.canvas_.width, this.canvas_.height)
+        console.log("Repainted")
+        this.force_refresh_ = false
     }
-
 }
 
 window.customElements.define('as-dithered-image', ASDitheredImage);
-
