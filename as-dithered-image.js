@@ -162,22 +162,27 @@ class ASDitheredImage extends HTMLElement {
         if (this.image_loading_ == true) {
             return
         }
+        this.image_loading_ = true
         const image = new Image()
-        image.onload = (() => {
-            this.image_loading_ = false
+        image.src = this.getAttribute("src")
+
+        // image.onerror is old and (literally) busted - it does not file on decode errors (ie if the src does not point to a valid image)
+        // The new way is promise based - possibly better
+        image.decode().then((() => {
             this.original_image_ = image
             this.ignore_next_resize_ = true
             this.canvas_.style.aspectRatio = this.original_image_.width + "/" + this.original_image_.height
             console.log("Setting Aspect Ratio to ", this.style.aspectRatio)
             this.force_refresh_ = true
             this.requestUpdate()
-        }).bind(this)
-        image.onerror = (() => {
-            this.image_loading_ == false
-            this.original_image_ = undefined
-        }).bind(this)
-        this.image_loading_ = true
-        image.src = this.getAttribute("src")
+        }).bind(this))
+            .catch(((decodeError) => {
+                console.log("Error decoding image: ", decodeError)
+                this.original_image_ = undefined
+            }).bind(this))
+            .finally((() => {
+                this.image_loading_ = false
+            }).bind(this))
     }
 
     repaintImage() {
