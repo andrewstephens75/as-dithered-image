@@ -50,7 +50,7 @@ class ASDitheredImage extends HTMLElement {
         this.canvas_.classList.add("ditheredImageStyle")
         shadowDOM.appendChild(this.canvas_)
 
-        this.context_ = this.canvas_.getContext("2d")
+        this.context_ = this.canvas_.getContext("2d", { willReadFrequently: true })
 
         const resizeObserver = new ResizeObserver(((entries) => {
             // browsers generated lots of resize events but we don't want to start refreshing until
@@ -90,6 +90,7 @@ class ASDitheredImage extends HTMLElement {
 
         if ((name === "src")) {
             this.force_refresh_ = true
+            this.original_image_ = undefined
             this.requestUpdate()
         } else if (name === "crunch") {
             if (newValue === "auto") {
@@ -136,7 +137,7 @@ class ASDitheredImage extends HTMLElement {
 
     getDevicePixelRatio() {
         // this should always be an integer for the dithering code to work
-        return Math.floor(window.devicePixelRatio)
+        return window.devicePixelRatio
     }
 
     // all drawing is funneled through requestUpdate so that multiple calls are coalesced to prevent
@@ -166,7 +167,8 @@ class ASDitheredImage extends HTMLElement {
             this.image_loading_ = false
             this.original_image_ = image
             this.ignore_next_resize_ = true
-            this.style.aspectRatio = this.original_image_.width + "/" + this.original_image_.height
+            this.canvas_.style.aspectRatio = this.original_image_.width + "/" + this.original_image_.height
+            console.log("Setting Aspect Ratio to ", this.style.aspectRatio)
             this.force_refresh_ = true
             this.requestUpdate()
         }).bind(this)
@@ -182,12 +184,22 @@ class ASDitheredImage extends HTMLElement {
         const rect = this.canvas_.getBoundingClientRect()
         let screenPixelsToBackingStorePixels = this.getDevicePixelRatio()
         let fractionalPart = screenPixelsToBackingStorePixels - Math.floor(screenPixelsToBackingStorePixels)
+
+        // that's it! I am officially giving up on trying to account for all the weird pixelDeviceRatios that Chrome likes
+        // to serve up at different zoom levels. I can understand nice fractions like 2.5 but 1.110004 and 0.89233 are just stupid
+        // If the fractional part doesn't make sense then just ignore it. This will give incorrect results but they still look
+        // pretty good if you don't look too closely.
+        if ((1.0 / fractionalPart) > 3) {
+            fractionalPart = 0
+            screenPixelsToBackingStorePixels = Math.round(screenPixelsToBackingStorePixels)
+        }
         if (fractionalPart != 0) {
             screenPixelsToBackingStorePixels = Math.round(screenPixelsToBackingStorePixels * Math.round(1.0 / fractionalPart))
         }
 
-        const calculatedWidth = rect.width * screenPixelsToBackingStorePixels
-        const calculatedHeight = rect.height * screenPixelsToBackingStorePixels
+        const calculatedWidth = Math.round(rect.width * screenPixelsToBackingStorePixels)
+        const calculatedHeight = Math.round(rect.height * screenPixelsToBackingStorePixels)
+        console.log(calculatedWidth, "x", calculatedHeight, "(" + screenPixelsToBackingStorePixels + ")")
         let adjustedPixelSize = screenPixelsToBackingStorePixels * this.crunchFactor_
 
         // double check - we may have already painted this image

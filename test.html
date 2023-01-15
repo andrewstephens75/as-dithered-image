@@ -27,10 +27,23 @@
             <option value="4">4</option>
         </select>
         <input id="cutoff" type="range" min="0.0" max="1.0" step="0.05" value="any" />
+        <input id="choosefile" type="file" />
     </div>
 </body>
 
 <script>
+    function displayFromFile(file) {
+        if (!file.type.startsWith("image/")) {
+            return
+        }
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            document.getElementById("picture").setAttribute("src", e.target.result)
+        }
+        reader.readAsDataURL(file)
+    }
+
     document.getElementById("dpr").innerText = window.devicePixelRatio
     let select = document.getElementById("crunchselect")
     select.addEventListener("change", e => {
@@ -41,6 +54,29 @@
         console.log("Value = ", e.target.value)
         document.getElementById("picture").setAttribute("cutoff", e.target.value)
 
+    })
+    document.getElementById("choosefile").addEventListener("change", e => {
+        const files = e.target.files
+        if (files.length == 0) {
+            return
+        }
+
+        displayFromFile(files[0])
+    }, false)
+
+    const pictureElement = document.getElementById("picture")
+    pictureElement.addEventListener("drop", e => {
+        e.preventDefault()
+
+        if (e.dataTransfer.files.length == 0) {
+            return
+        }
+        displayFromFile(e.dataTransfer.files[0])
+
+    })
+
+    pictureElement.addEventListener("dragover", e => {
+        e.preventDefault()  // need this to disable the default
     })
 </script>
 
