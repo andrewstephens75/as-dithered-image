@@ -2,19 +2,13 @@
 <html>
 
 <head>
-    <title>Test Page</title>
+    <title>as-dithered-image.js Test Page</title>
 </head>
 
 <body>
     <script src="as-dithered-image.js"></script>
-    <style>
-        .setSize {
-            width: 80%;
-            min-width: 80%;
-        }
-    </style>
 
-    <div style="min-height: 4000px; border: 1px solid black"></div>
+    <p>A short, hacky demo page - used only for internal testing. See the blog post for a better one.</p>
 
     <as-dithered-image class="setSize" id="picture"
         src="Van_Gogh_-_Starry_Night_-_Google_Art_Project.jpg"></as-dithered-image>
@@ -30,6 +24,7 @@
         </select>
         <input id="cutoff" type="range" min="0.0" max="1.0" step="0.05" value="any" />
         <input id="choosefile" type="file" />
+        Drag and drop works as well
     </div>
 </body>
 
