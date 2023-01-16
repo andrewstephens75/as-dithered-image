@@ -14,50 +14,37 @@ The only way to get really crisp results in a web browser is to dither the sourc
 
 There is other javascript floating around out there that does much the same thing. as-dithered-image has a few advantages:
 
-* I put some effort into getting really crisp results even on high-DPI displays. Most of the other code looks slightly blurry due to not taking this into account.
-* Resizing is completely supported, allowing for dithered images in responsive designs.
+* I put some effort into getting really crisp results even on high-DPI displays. Most of the other code out there looks slightly blurry due to not taking this into account.
+* Resizing is completely supported, allowing for dithered images in responsive designs. The element automatically adjusts its aspect ratio based on the image.
+* Dithering is performed in a web worker so as to not block rendering of the rest of the page.
+* as-dithered-image elements that are completely offscreen are not dithered until they are just about to scroll into view
 * Accessibility is supported with the **alt** tag.
-* Some control over the look of the dither is supported with the **crunch** attribute.
+* Some control over the look of the dither is supported with the **crunch** and **cutoff** attributes.
 
 ## Usage
+
+You will need to copy the following two files into your web project, they should be placed together in the same directory.
+
+* as-dithered-image.js
+* ditherworker.js
 
 Example usage:
 
 ```
 <script src="as-dithered-image.js"></script>
 
-...
-
-<style>
-    .canvasstyle {
-        display: inline-block;
-        width: 90%;
-        aspect-ratio: 640 / 954;
-        min-width: 90%;
-        padding: auto;
-        margin: auto;
-    }
-</style>
-
-...
-
-<as-dithered-image src="mypicture.jpg" alt="Description of the image for screen readers" crunch="2" class="canvasstyle"></as-dithered-image>
+<as-dithered-image src="mypicture.jpg" alt="Description of the image for screen readers"></as-dithered-image>
 ```
 
-as-dithered-image takes 3 attributes:
+as-dithered-image takes 4 attributes:
 
- * **src** the url of the image
- * **alt** the alt text, important for screen readers
+ * **src** the url of the image. Can be a data url.
+ * **alt** the alt text, important for screen readers.
  * **crunch** controls the size of the logical pixels the image is dithered into. May be one of: 
    * an integer, where 1 means dither to logical css pixels no matter what the DPI. 2 makes the logical pixels twice the size, for a coarser look. 3 is really blocky.
    * **auto** (the default) attempts to give good results on very high-DPI screens (like iPhones) which have such small pixels that standard dithering just looks grey. It is equivalent of 1 on most displays and 2 on devices where the ratio of screen to css pixels is 3 or more.
    * **pixel** dither to screen pixels. This can either look amazing or be completely wasted depending on the size of the screen but you paid for all the pixels so you might as well use them.
-
-## Downsides and Future Improvements
-
-As it stands, as-dithered-image as a few warts. The size of the source image is not taken into account, you must set the size in the CSS which means you have to know the aspect ratio of your image up front.
-
-Dithering is not free, processing the image takes time. Currently this is done on the main UI thread of the browser which can lead to poor UI performance. This processing could be moved to a background thread but I got lazy.
+* **cutoff** a float between 0 and 1, defaulting to 0.5. Controls the cutoff the dithering algorithm uses to determine whether a pixel is black or white. Modifying this will produce either a lighter or darker image.
 
 ## Legal 
 
