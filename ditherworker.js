@@ -1,5 +1,4 @@
 onmessage = function (e) {
-    console.log("Worker: start", e.data)
 
     const result = dither(e.data.imageData, e.data.pixelSize, e.data.cutoff)
     const reply = {}

@@ -24,7 +24,6 @@ class ASDitheredImage extends HTMLElement {
 
         this.worker_.onmessage = ((e) => {
             const imageData = e.data.imageData
-            console.log("Image painted ", imageData.width, imageData.height)
             this.context_.putImageData(imageData, 0, 0)
         }).bind(this)
 
@@ -77,9 +76,21 @@ class ASDitheredImage extends HTMLElement {
         }).bind(this))
 
         resizeObserver.observe(this.canvas_)
+
+        // since we avoid drawing the image if the element of far offscreen we need to use
+        // an IntersectionObserver to notify use when the element is likely to be displayed
+        const intersectionObserver = new IntersectionObserver(((intersections) => {
+            if (intersections.length > 0) {
+                if (intersections[0].isIntersecting) {
+                    this.force_refresh_ = true
+                    this.requestUpdate()
+                }
+            }
+        }).bind(this), { root: null, rootMargin: "1000px", threshold: [0] })
+        intersectionObserver.observe(this)
+
         this.force_refresh_ = true
         this.requestUpdate()
-
     }
 
     static get observedAttributes() { return ["src", "crunch", "alt", "cutoff"] }
@@ -140,9 +151,29 @@ class ASDitheredImage extends HTMLElement {
         return window.devicePixelRatio
     }
 
+    isInOrNearViewport() {
+        // this only handles vertical scrolling, could be extended later to handle horizontal
+        // but it probably doesn't matter
+        const margin = 1500
+        const r = this.getBoundingClientRect()
+
+        const viewHeight = Math.max(document.documentElement.clientHeight, window.innerHeight)
+        const above = r.bottom + margin < 0
+        const below = r.top - margin > viewHeight
+
+        return (!above && !below)
+    }
+
     // all drawing is funneled through requestUpdate so that multiple calls are coalesced to prevent
     // processing the image multiple times for no good reason
     requestUpdate() {
+
+        if (this.original_image_ != undefined) {
+            if (this.isInOrNearViewport() == false) {
+                return // suppress update, the intersection observer will call us back as the element scrolls into view
+            }
+        }
+
         window.requestAnimationFrame(((timestamp) => {
             if ((this.force_refresh_ == false)) {
                 return
@@ -172,7 +203,6 @@ class ASDitheredImage extends HTMLElement {
             this.original_image_ = image
             this.ignore_next_resize_ = true
             this.canvas_.style.aspectRatio = this.original_image_.width + "/" + this.original_image_.height
-            console.log("Setting Aspect Ratio to ", this.style.aspectRatio)
             this.force_refresh_ = true
             this.requestUpdate()
         }).bind(this))
@@ -204,7 +234,6 @@ class ASDitheredImage extends HTMLElement {
 
         const calculatedWidth = Math.round(rect.width * screenPixelsToBackingStorePixels)
         const calculatedHeight = Math.round(rect.height * screenPixelsToBackingStorePixels)
-        console.log(calculatedWidth, "x", calculatedHeight, "(" + screenPixelsToBackingStorePixels + ")")
         let adjustedPixelSize = screenPixelsToBackingStorePixels * this.crunchFactor_
 
         // double check - we may have already painted this image
