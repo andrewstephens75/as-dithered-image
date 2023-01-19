@@ -1,8 +1,8 @@
 # Custom HTML Element for Client-side Atkinson Dithering
 
-There are many dithering algorithms to crush multi-colored images down to black and which but the one I like best was introduce with the original Apple Macintosh for its crisp 512x342 monochrome display. One of Apple's engineers, [Bill Atkinson](https://en.wikipedia.org/wiki/Bill_Atkinson), developed what came to be known as Atkinson Dithering, a good trade-off between fast and accurate with results possessing a certain charm that on-paper "better" dithers cannot match.
+There are many dithering algorithms to crush multi-colored images down to black and white but the one I like best was introduced with the original Apple Macintosh for its crisp 512x342 monochrome display. One of Apple's engineers, [Bill Atkinson](https://en.wikipedia.org/wiki/Bill_Atkinson), developed what came to be known as Atkinson Dithering, a good trade-off between fast and accurate with results possessing a certain charm that on-paper "better" dithers cannot match.
 
-I wanted to bring this to the web. For some examples of how to use this project see [my blog post on the subject](https://sheep.horse/2022/12/pixel_accurate_atkinson_dithering_for_images_in_ht.html).
+I wanted to bring this to the web. For some examples of how to use this project and **an interactive demo** see [my blog post on the subject](https://sheep.horse/2023/1/improved_web_component_for_pixel-accurate_atkinson.html).
 
 ## Why Do This Client Side?
 
