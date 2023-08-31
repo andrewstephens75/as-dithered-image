@@ -36,15 +36,17 @@ Example usage:
 <as-dithered-image src="mypicture.jpg" alt="Description of the image for screen readers"></as-dithered-image>
 ```
 
-as-dithered-image takes 4 attributes:
+as-dithered-image takes 6 attributes:
 
- * **src** the url of the image. Can be a data url.
- * **alt** the alt text, important for screen readers.
- * **crunch** controls the size of the logical pixels the image is dithered into. May be one of: 
+ * **src** (required) the url of the image. Can be a data url.
+ * **alt** (strictly speaking optional, but it is rude not to) the alt text, important for screen readers.
+ * **crunch** (optional) controls the size of the logical pixels the image is dithered into. May be one of: 
    * an integer, where 1 means dither to logical css pixels no matter what the DPI. 2 makes the logical pixels twice the size, for a coarser look. 3 is really blocky.
    * **auto** (the default) attempts to give good results on very high-DPI screens (like iPhones) which have such small pixels that standard dithering just looks grey. It is equivalent of 1 on most displays and 2 on devices where the ratio of screen to css pixels is 3 or more.
    * **pixel** dither to screen pixels. This can either look amazing or be completely wasted depending on the size of the screen but you paid for all the pixels so you might as well use them.
-* **cutoff** a float between 0 and 1, defaulting to 0.5. Controls the cutoff the dithering algorithm uses to determine whether a pixel is black or white. Modifying this will produce either a lighter or darker image.
+* **cutoff** (optional) a float between 0 and 1, defaulting to 0.5. Controls the cutoff the dithering algorithm uses to determine whether a pixel is black or white. Modifying this will produce either a lighter or darker image.
+* **darkrgba** (optional) a string of the form `"rgba(0, 0, 0, 255)"` (and only this form because I am lazy). Sets the RGBA value for dark pixels, defaulting to fully opaque black, useful for matching the image to the colors of the surrounding page or making transparent areas. Note that this just controls the output color, the dithering is still performed based on the closeness of a pixel to black or white.
+* **lightrgba** (optional) a string of the form `"rgba(255, 255, 255, 255)"`. Similar to the above but for the light pixels.
 
 ## Legal 
 
