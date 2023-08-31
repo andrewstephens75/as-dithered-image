@@ -21,6 +21,8 @@ class ASDitheredImage extends HTMLElement {
         this.ignore_next_resize_ = false
         this.worker_ = new Worker("ditherworker.js")
         this.cutoff_ = 0.5
+        this.darkrgba_ = [0, 0, 0, 255]
+        this.lightrgba_ = [255, 255, 255, 255]
 
         this.worker_.onmessage = ((e) => {
             const imageData = e.data.imageData
@@ -93,7 +95,7 @@ class ASDitheredImage extends HTMLElement {
         this.requestUpdate()
     }
 
-    static get observedAttributes() { return ["src", "crunch", "alt", "cutoff"] }
+    static get observedAttributes() { return ["src", "crunch", "alt", "cutoff", "darkrgba", "lightrgba"] }
 
 
     attributeChangedCallback(name, oldValue, newValue) {
@@ -132,7 +134,18 @@ class ASDitheredImage extends HTMLElement {
             this.cutoff_ = Math.min(1.0, Math.max(0.0, this.cutoff_))
             this.force_refresh_ = true
             this.requestUpdate()
+        } else if (name === "darkrgba") {
+            // must be in the form "rgba(10, 10, 10, 255)"
+            this.darkrgba_ = this.parseRGBA(newValue)
+            this.force_refresh_ = true
+            this.requestUpdate()
         }
+        else if (name === "lightrgba") {
+            this.lightrgba_ = this.parseRGBA(newValue)
+            this.force_refresh_ = true
+            this.requestUpdate()
+        }
+
     }
 
     // The crunch factor defaults 1 css pixel to 1 dither pixel which I think looks best when the device pixel ratio is 1 or 2
@@ -215,6 +228,16 @@ class ASDitheredImage extends HTMLElement {
             }).bind(this))
     }
 
+    parseRGBA(s) {
+        var matches = s.match(/^rgba\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\,\s*(\d+)\s*\)$/i);
+        if (matches) {
+            return [matches[1], matches[2], matches[3], matches[4]]
+        }
+        else {
+            return [255, 255, 255, 255]
+        }
+    }
+
     repaintImage() {
         const rect = this.canvas_.getBoundingClientRect()
         let screenPixelsToBackingStorePixels = this.getDevicePixelRatio()
@@ -241,7 +264,10 @@ class ASDitheredImage extends HTMLElement {
             (this.last_draw_state_.height == calculatedHeight) &&
             (this.last_draw_state_.adjustedPixelSize == adjustedPixelSize) &&
             (this.last_draw_state_.imageSrc == this.original_image_.currentSrc) &&
-            (this.last_draw_state_.cutoff == this.cutoff_)) {
+            (this.last_draw_state_.cutoff == this.cutoff_) &&
+            (this.last_draw_state_.darkrgba == this.darkrgba_) &&
+            (this.last_draw_state_.lightrgba == this.lightrgba_)
+        ) {
             return;  // nothing to do
         }
 
@@ -253,18 +279,22 @@ class ASDitheredImage extends HTMLElement {
         this.last_draw_state_.adjustedPixelSize = adjustedPixelSize
         this.last_draw_state_.imageSrc = this.original_image_.currentSrc
         this.last_draw_state_.cutoff = this.cutoff_
+        this.last_draw_state_.darkrgba = this.darkrgba_
+        this.last_draw_state_.lightrgba = this.lightrgba_
+
 
         this.context_.imageSmoothingEnabled = true
         this.context_.drawImage(this.original_image_, 0, 0, this.canvas_.width / adjustedPixelSize, this.canvas_.height / adjustedPixelSize)
         const originalData = this.context_.getImageData(0, 0, this.canvas_.width / adjustedPixelSize, this.canvas_.height / adjustedPixelSize)
-        this.context_.fillStyle = "white"
-        this.context_.fillRect(0, 0, this.canvas_.width, this.canvas_.height)
+        this.context_.clearRect(0, 0, this.canvas_.width, this.canvas_.height)
         // TODO: look at transferring the data in a different datastructure to prevent copying
         // unfortunately Safari has poor support for createImageBitmap - using it with ImageData doesn't work
         const msg = {}
         msg.imageData = originalData
         msg.pixelSize = adjustedPixelSize
         msg.cutoff = this.cutoff_
+        msg.blackRGBA = this.darkrgba_
+        msg.whiteRGBA = this.lightrgba_
         this.worker_.postMessage(msg)
 
         this.force_refresh_ = false
