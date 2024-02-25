@@ -8,6 +8,8 @@ const DITHERED_IMAGE_STYLE = `
 }
 `
 
+const workerPath = document.currentScript.src.replace("as-dithered-image.js", "ditherworker.js")
+
 class ASDitheredImage extends HTMLElement {
     constructor() {
         super()
@@ -19,7 +21,7 @@ class ASDitheredImage extends HTMLElement {
         this.context_ = undefined
         this.image_loading_ = false
         this.ignore_next_resize_ = false
-        this.worker_ = new Worker("ditherworker.js")
+        this.worker_ = new Worker(workerPath)
         this.cutoff_ = 0.5
         this.darkrgba_ = [0, 0, 0, 255]
         this.lightrgba_ = [255, 255, 255, 255]
@@ -247,6 +249,10 @@ class ASDitheredImage extends HTMLElement {
         // to serve up at different zoom levels. I can understand nice fractions like 2.5 but 1.110004 and 0.89233 are just stupid
         // If the fractional part doesn't make sense then just ignore it. This will give incorrect results but they still look
         // pretty good if you don't look too closely.
+        if (this.getAttribute("crunch") == "pixel") {
+            this.crunchFactor_ = 1.0 / this.getDevicePixelRatio()
+        }
+
         if ((1.0 / fractionalPart) > 3) {
             fractionalPart = 0
             screenPixelsToBackingStorePixels = Math.round(screenPixelsToBackingStorePixels)
@@ -257,7 +263,7 @@ class ASDitheredImage extends HTMLElement {
 
         const calculatedWidth = Math.round(rect.width * screenPixelsToBackingStorePixels)
         const calculatedHeight = Math.round(rect.height * screenPixelsToBackingStorePixels)
-        let adjustedPixelSize = screenPixelsToBackingStorePixels * this.crunchFactor_
+        let adjustedPixelSize = Math.round(screenPixelsToBackingStorePixels * this.crunchFactor_)
 
         // double check - we may have already painted this image
         if ((this.last_draw_state_.width == calculatedWidth) &&
