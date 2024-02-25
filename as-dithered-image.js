@@ -265,8 +265,6 @@ class ASDitheredImage extends HTMLElement {
         const calculatedHeight = Math.round(rect.height * screenPixelsToBackingStorePixels)
         let adjustedPixelSize = Math.round(screenPixelsToBackingStorePixels * this.crunchFactor_)
 
-        console.log("cunch: ", this.crunchFactor_, " adjustedPixelSize : ", adjustedPixelSize)
-
         // double check - we may have already painted this image
         if ((this.last_draw_state_.width == calculatedWidth) &&
             (this.last_draw_state_.height == calculatedHeight) &&
